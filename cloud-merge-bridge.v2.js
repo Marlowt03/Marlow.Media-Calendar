@@ -121,18 +121,26 @@
       if (busy || !window.supa) return;
       busy = true;
       try {
-        const row = await readCloudRow();
-        if (!row || !row.state) { busy = false; return; }
-        const serverTs = row.updated_at || '';
-        const lastTs = getLastServerTime();
-        if (serverTs && serverTs !== lastTs) {
-          adoptRemoteState(row);
-          setLastServerTime(serverTs);
-          log('poll: adopted newer cloud (serverTs changed)');
-        }
-      } catch (_e) {}
-      busy = false;
-    }, 8000);
-  })();
+       const row = await readCloudRow();
+if (!row || !row.state) { log('boot: no cloud row'); return; }
 
-})();
+const serverTs = row.updated_at || '';
+const lastTs = getLastServerTime();
+
+// Is local empty? (no clients AND no tasks)
+let hasLocal = false;
+try {
+  const local = JSON.parse(localStorage.getItem('marlow.dashboard.v23') || 'null');
+  const c = local && local.clients ? Object.keys(local.clients).length : 0;
+  const t = local && Array.isArray(local.tasks) ? local.tasks.length : 0;
+  hasLocal = (c + t) > 0;
+} catch (_) {}
+
+if (!hasLocal || (serverTs && serverTs !== lastTs)) {
+  adoptRemoteState(row);
+  setLastServerTime(serverTs);
+  log(!hasLocal ? 'boot: adopted cloud (local empty)'
+                : 'boot: adopted cloud (serverTs changed)');
+} else {
+  log('boot: no adoption needed');
+}
