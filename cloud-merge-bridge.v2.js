@@ -32,20 +32,24 @@
     } catch (e) { warn('load exception', e); return null; }
   }
 
-  function adoptRemoteState(remote){
-    if (!remote || !remote.state) return;
-    // Persist the server snapshot into localStorage to mirror the cloud
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(remote.state));
-    } catch (_e) {}
-    // Replace the in‑memory state with a deep copy of the remote payload.  Do not
-    // merge with the existing state, as that can leave behind stale keys.
-    try {
-      window.state = JSON.parse(JSON.stringify(remote.state));
-    } catch (_e) {
-      // Fallback to shallow assignment if JSON parsing fails for some reason
-      window.state = Object.assign({}, remote.state);
-    }
+ function adoptRemoteState(remote){
+  if (!remote || !remote.state) return;
+
+  // Persist full cloud snapshot
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(remote.state));
+  } catch (_){}
+
+  // Replace in-memory state and keep both refs in sync
+  try {
+    window.state = JSON.parse(JSON.stringify(remote.state));
+    // Many parts of index.html use the module-scoped `state` variable.
+    if (typeof state !== 'undefined') { state = window.state; }
+  } catch (_){}
+
+  // Re-render after adoption
+  try { if (typeof window.render === 'function') window.render(); } catch (_){}
+}
     // Re‑render the UI after adopting remote state.  renderClients() updates
     // client lists and render() refreshes the entire app when present.  These
     // calls must be wrapped in try/catch to avoid breaking the bridge if the
